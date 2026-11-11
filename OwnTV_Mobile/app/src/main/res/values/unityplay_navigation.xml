@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="unityplay_nav_home" translatable="false">Início</string>
+    <string name="unityplay_nav_live" translatable="false">TV ao vivo</string>
+    <string name="unityplay_nav_movies" translatable="false">Filmes</string>
+    <string name="unityplay_nav_series" translatable="false">Série</string>
+    <string name="unityplay_nav_settings" translatable="false">Configurações</string>
+    <string name="unityplay_live_channels" translatable="false">Canais</string>
+    <string name="unityplay_live_guide" translatable="false">Guia de programação</string>
+</resources>
