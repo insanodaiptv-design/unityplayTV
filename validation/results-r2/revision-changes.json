@@ -1,0 +1,22 @@
+[
+  {
+    "file": "smali/ts5.smali",
+    "before": "881ec9a379cfd7e579bbd1e11c0dd7bb69e1087a93106422c67f2ebad6895ede",
+    "after": "12091dd88a49be4e8045f51f89da7985e16baee8a7686ae84dd6a67dcbea14a5"
+  },
+  {
+    "file": "smali/u15.smali",
+    "before": "149451bdf086230f7ca0587237d6748bea172dee332bdc06cb093e02b21409db",
+    "after": "b9c4eda529e49868f979df2a0543ac353dcc206d6000236fd2ce95322e930d8a"
+  },
+  {
+    "file": "smali_classes2/hy0.smali",
+    "before": "4738116e17b9e75af474532f01c4acfbed06fdc691ace6097579c6348b3eb550",
+    "after": "5d4c039386de172d4e75e66abcbe0070780931741a0c30e568c22e8f6b648032"
+  },
+  {
+    "file": "smali_classes2/tv/own/owntv/core/brand/AppIcon.smali",
+    "before": "dfd5c00ff23f4763e23b96c8fffa53a0bf14284de0e0e547b53d7bf7a6d59726",
+    "after": "7a8582f2e5afe772ef2520ddbebbff7111d535c49234b0be9d81e80c35aa8bf7"
+  }
+]
