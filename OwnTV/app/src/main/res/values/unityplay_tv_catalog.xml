@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+ <string name="unityplay_vod_action_hint">OK: %1$s · Voltar: catálogo</string>
+ <string name="unityplay_parental_title">Senha parental</string>
+ <string name="unityplay_parental_wrong">Senha incorreta. Tente novamente.</string>
+ <string name="unityplay_parental_change">Alterar a senha usada para abrir conteúdos adultos</string>
+ <string name="unityplay_parental_current">Informe a senha parental atual</string>
+ <string name="unityplay_parental_new">Nova senha parental: 4 números</string>
+ <string name="unityplay_parental_confirm">Confirme a nova senha parental</string>
+</resources>

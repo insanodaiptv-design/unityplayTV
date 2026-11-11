@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="unityplay_tv_welcome">BEM-VINDO AO</string>
+    <string name="unityplay_tv_playlist">Lista de reprodução</string>
+    <string name="unityplay_tv_name">Nome</string>
+    <string name="unityplay_tv_url">URL</string>
+    <string name="unityplay_tv_empty" translatable="false" />
+</resources>
