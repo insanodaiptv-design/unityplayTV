@@ -20,7 +20,7 @@ import tv.own.owntv.mobile.ui.screens.guide.GuideScreen
 
 /** The guide belongs to live television rather than taking a catalogue's bottom-bar slot. */
 internal enum class LiveTvSection(@param:StringRes val labelRes: Int) {
-    CHANNELS(R.string.unityplay_live_channels),
+    CHANNELS(R.string.settings_customize_categories),
     GUIDE(R.string.unityplay_live_guide),
 }
 
@@ -44,14 +44,20 @@ fun LiveTvHubScreen(
 ) {
     // Preserve the active section across rotation and trips to a channel's details.
     var section by rememberSaveable { mutableStateOf(LiveTvSection.CHANNELS) }
+    var categoryPicker by rememberSaveable { mutableStateOf(false) }
     Column(modifier.fillMaxSize()) {
-        LiveTvSectionTabs(selected = section, onSelect = { section = it })
+        LiveTvSectionTabs(selected = section, onSelect = {
+            section = it
+            categoryPicker = it == LiveTvSection.CHANNELS
+        })
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (section) {
                 LiveTvSection.CHANNELS -> LiveScreen(
                     scrollToTop = scrollToTop,
                     onOpenChannel = onOpenChannel,
                     onOpenPlayer = onOpenPlayer,
+                    categoryPicker = categoryPicker,
+                    onCategoryPickerChange = { categoryPicker = it },
                     modifier = Modifier.fillMaxSize(),
                 )
                 LiveTvSection.GUIDE -> GuideScreen(

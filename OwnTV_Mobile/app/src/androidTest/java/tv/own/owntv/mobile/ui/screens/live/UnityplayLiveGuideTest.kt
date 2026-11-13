@@ -13,17 +13,17 @@ import org.junit.Test
 class UnityplayLiveGuideTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun guideAndChannelsAreSeparateSelectableSectionsInsideLiveTv() {
+    @Test fun categoriesAndGuideAreAvailableInsideLiveTv() {
         val selected = mutableStateOf(LiveTvSection.CHANNELS)
         compose.setContent {
             MaterialTheme {
                 LiveTvSectionTabs(selected.value) { selected.value = it }
             }
         }
-        compose.onNodeWithText("Canais").assertIsDisplayed()
+        compose.onNodeWithText("Categorias").assertIsDisplayed()
         compose.onNodeWithText("Guia de programação").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(LiveTvSection.GUIDE, selected.value) }
-        compose.onNodeWithText("Canais").performClick()
+        compose.onNodeWithText("Categorias").performClick()
         compose.runOnIdle { assertEquals(LiveTvSection.CHANNELS, selected.value) }
     }
 }

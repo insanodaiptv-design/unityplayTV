@@ -4,7 +4,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import tv.own.owntv.mobile.R
 import tv.own.owntv.mobile.ui.theme.MobileDimens
 
@@ -36,12 +39,14 @@ fun CategoryPickerSheet(
      * just set, so choosing a category made the whole picker vanish.
      */
     dismissOnSelect: Boolean = true,
+    title: String? = null,
+    categoryAction: (Int) -> (() -> Unit)? = { null },
 ) {
     var query by remember { mutableStateOf("") }
     val matches = remember(labels, query) {
         labels.withIndex().filter { (_, label) -> label.contains(query.trim(), ignoreCase = true) }
     }
-    MobileBottomSheet(onDismissRequest = onDismiss) {
+    MobileBottomSheet(onDismissRequest = onDismiss, title = title) {
         MobileTextField(
             value = query,
             onValueChange = { query = it },
@@ -58,6 +63,7 @@ fun CategoryPickerSheet(
                     } else {
                         null
                     },
+                    onLongClick = categoryAction(index),
                     onClick = {
                         onSelect(index)
                         if (dismissOnSelect) onDismiss()
@@ -66,4 +72,14 @@ fun CategoryPickerSheet(
             }
         }
     }
+}
+
+@Composable
+internal fun ActiveCategoryChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FilterChip(
+        selected = true,
+        onClick = onClick,
+        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        modifier = modifier,
+    )
 }

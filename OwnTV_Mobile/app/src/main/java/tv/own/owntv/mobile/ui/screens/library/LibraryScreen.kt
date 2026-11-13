@@ -29,6 +29,7 @@ import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,7 +59,7 @@ import tv.own.owntv.mobile.R
 import tv.own.owntv.mobile.ui.components.MobileSlider
 import tv.own.owntv.mobile.ui.components.CategoryPickerSheet
 import tv.own.owntv.mobile.ui.components.BrowseCategorySheet
-import tv.own.owntv.mobile.ui.components.FilterChipRow
+import tv.own.owntv.mobile.ui.components.ActiveCategoryChip
 import tv.own.owntv.mobile.ui.components.MobileBottomSheet
 import tv.own.owntv.mobile.ui.components.MobileListRow
 import tv.own.owntv.mobile.ui.components.mobileGroupPlate
@@ -131,7 +132,7 @@ fun LibraryScreen(
 
     var menuFor by remember { mutableStateOf<VodItem?>(null) }
     var sheetOpen by remember { mutableStateOf(false) }
-    var categoryPicker by remember { mutableStateOf(false) }
+    var categoryPicker by rememberSaveable(tab) { mutableStateOf(false) }
     var categoryMenuFor by remember { mutableStateOf<VodCategory?>(null) }
 
     val twoPane = isExpandedWidth()
@@ -178,36 +179,43 @@ fun LibraryScreen(
                 }
             }
         }
-        if (lockedKey == null) Box(Modifier.fillMaxWidth()) {
-            FilterChipRow(
-                labels = categories.map { it.label(tab) },
-                selectedIndex = categories.indexOfFirst { it.key == selected },
-                onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
-                modifier = Modifier.padding(end = MobileDimens.TouchTarget * 2),
-                // All, Favorites and History are not folders: there is nothing to hide or move.
-                onLongPress = { index ->
-                    categoryMenuFor = categories.getOrNull(index)?.takeIf { it.builtIn == null }
-                },
-                onLongPressLabel = stringResource(R.string.settings_customize_categories),
-            )
-            Row(Modifier.align(Alignment.CenterEnd)) {
-                IconButton(onClick = { categoryPicker = true }) {
-                    Icon(MobileIcons.Search, stringResource(R.string.content_search_categories))
+        val categoryLabel = categories.firstOrNull { it.key == selected }?.label(tab)
+            ?: stringResource(if (tab == LibraryTab.MOVIES) R.string.content_category_all_movies else R.string.content_category_all_series)
+        if (lockedKey == null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = MobileDimens.ChipRowPaddingH),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { categoryPicker = true }) {
+                    Text(stringResource(R.string.settings_customize_categories))
                 }
+                ActiveCategoryChip(
+                    label = categoryLabel,
+                    onClick = { categoryPicker = true },
+                    modifier = Modifier.weight(1f),
+                )
                 IconButton(onClick = { sheetOpen = true }) {
                     Icon(MobileIcons.Tune, stringResource(R.string.content_sorting))
                 }
             }
+            if (categoryPicker) {
+                CategoryPickerSheet(
+                    labels = categories.map { it.label(tab) },
+                    selectedIndex = categories.indexOfFirst { it.key == selected },
+                    onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
+                    onDismiss = { categoryPicker = false },
+                    title = stringResource(R.string.settings_customize_categories),
+                    categoryAction = { index ->
+                        categories.getOrNull(index)?.takeIf { it.builtIn == null }?.let { category ->
+                            {
+                                categoryPicker = false
+                                categoryMenuFor = category
+                            }
+                        }
+                    },
+                )
+            }
         }
-        if (categoryPicker) {
-            CategoryPickerSheet(
-                labels = categories.map { it.label(tab) },
-                selectedIndex = categories.indexOfFirst { it.key == selected },
-                onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
-                onDismiss = { categoryPicker = false },
-            )
-        }
-        val categoryLabel = categories.firstOrNull { it.key == selected }?.label(tab).orEmpty()
         Text(
             // "Action (312 movies)" — core's own wording, so the count reads as it does on the TV.
             text = pluralStringResource(

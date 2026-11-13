@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -45,7 +44,7 @@ import tv.own.owntv.mobile.R
 import tv.own.owntv.mobile.ui.components.CategoryPickerSheet
 import tv.own.owntv.mobile.ui.components.ChannelLogoImage
 import tv.own.owntv.mobile.ui.components.BrowseCategorySheet
-import tv.own.owntv.mobile.ui.components.FilterChipRow
+import tv.own.owntv.mobile.ui.components.ActiveCategoryChip
 import tv.own.owntv.mobile.ui.components.MobileListRow
 import tv.own.owntv.mobile.ui.components.TwoPane
 import tv.own.owntv.mobile.ui.components.mobileGroupPlate
@@ -78,6 +77,8 @@ fun LiveScreen(
      */
     lockedKey: LiveKey? = null,
     vm: LiveViewModel = koinViewModel(),
+    categoryPicker: Boolean = false,
+    onCategoryPickerChange: (Boolean) -> Unit = {},
 ) {
     // Locking and unlocking are one pair: the pin belongs to this screen's lifetime, not to the view
     // model's. On the television that view model is a single instance shared with the browse section,
@@ -110,7 +111,6 @@ fun LiveScreen(
     listState.ObeyScrollToTop(route = "live", scrollToTop = scrollToTop)
 
     var menuFor by remember { mutableStateOf<ChannelEntity?>(null) }
-    var categoryPicker by remember { mutableStateOf(false) }
     var categoryMenuFor by remember { mutableStateOf<LiveCategory?>(null) }
     // Survives a rotation, so turning a tablet keeps the channel you were watching beside the list.
     var previewing by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -141,32 +141,30 @@ fun LiveScreen(
 
     val listPane = @Composable {
     Column(Modifier.fillMaxSize()) {
-        if (lockedKey == null) Box(Modifier.fillMaxWidth()) {
-            FilterChipRow(
-                labels = categories.map { it.label() },
-                selectedIndex = categories.indexOfFirst { it.key == selected },
-                onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
-                modifier = Modifier.padding(end = MobileDimens.TouchTarget),
-                // All, Favorites, History and Catch-up are not folders: there is nothing to hide or move.
-                onLongPress = { index ->
-                    categoryMenuFor = categories.getOrNull(index)?.takeIf { it.builtIn == null }
-                },
-                onLongPressLabel = stringResource(R.string.settings_customize_categories),
+        if (lockedKey == null) {
+            ActiveCategoryChip(
+                label = categories.firstOrNull { it.key == selected }?.label()
+                    ?: stringResource(R.string.content_category_all_channels),
+                onClick = { onCategoryPickerChange(true) },
+                modifier = Modifier.padding(horizontal = MobileDimens.ChipRowPaddingH),
             )
-            IconButton(
-                onClick = { categoryPicker = true },
-                modifier = Modifier.align(Alignment.CenterEnd),
-            ) {
-                Icon(MobileIcons.Search, stringResource(R.string.content_search_categories))
+            if (categoryPicker) {
+                CategoryPickerSheet(
+                    labels = categories.map { it.label() },
+                    selectedIndex = categories.indexOfFirst { it.key == selected },
+                    onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
+                    onDismiss = { onCategoryPickerChange(false) },
+                    title = stringResource(R.string.settings_customize_categories),
+                    categoryAction = { index ->
+                        categories.getOrNull(index)?.takeIf { it.builtIn == null }?.let { category ->
+                            {
+                                onCategoryPickerChange(false)
+                                categoryMenuFor = category
+                            }
+                        }
+                    },
+                )
             }
-        }
-        if (categoryPicker) {
-            CategoryPickerSheet(
-                labels = categories.map { it.label() },
-                selectedIndex = categories.indexOfFirst { it.key == selected },
-                onSelect = { index -> categories.getOrNull(index)?.let { vm.select(it.key) } },
-                onDismiss = { categoryPicker = false },
-            )
         }
         PullToRefreshBox(
             isRefreshing = refreshing,
