@@ -286,8 +286,9 @@ class LiveViewModel(
         }
     }
 
-    private val livePreviewAudio: StateFlow<Boolean> = settings.livePreviewAudio
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val livePreviewAudio: StateFlow<Boolean?> = settings.livePreviewAudioPreference
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    private var previewUserConfirmed = false
 
     /** Settings → "Channel numbers": shows the provider number in the lists and the player, and enables
      *  typing one to tune. Off hides every number without touching the stored data. Eager so a playback
@@ -997,12 +998,13 @@ class LiveViewModel(
     // dead — otherwise "no preview" looks like a broken channel (F31).
     val previewBlockedSingleSession: StateFlow<Boolean> = live.previewBlockedSingleSession
 
-    /** In-pane preview playback (no history) — triggered by the UI after the focus settles. */
-    fun playPreview(channel: ChannelEntity) {
+    /** Play the selected channel or a focus preview without adding it to history. */
+    fun playPreview(channel: ChannelEntity, userConfirmed: Boolean = false) {
         if (channel.categoryId != null && channel.categoryId in hiddenCategoryIds.value) return
+        previewUserConfirmed = userConfirmed
         // Core keeps the preview off a promoted full-screen stream, re-mutes on a re-focus instead of
         // reloading, mints a Stalker link, and holds back on a one-session panel while mpv plays.
-        live.preview(channel, muted = !livePreviewAudio.value)
+        live.preview(channel, muted = !previewAudioEnabled(livePreviewAudio.value, userConfirmed))
     }
 
     // --- Multiview: channels kept from the browse screen ------------------------------------------
@@ -1180,8 +1182,10 @@ class LiveViewModel(
     // starts inline during construction and must not touch a property initialized further down the class.
     init {
         viewModelScope.launch {
-            livePreviewAudio.collect { on ->
-                if (!liveOnExo.value && previewEngine.currentUrl != null) previewEngine.setMuted(!on)
+            livePreviewAudio.collect { preference ->
+                if (!liveOnExo.value && previewEngine.currentUrl != null) {
+                    previewEngine.setMuted(!previewAudioEnabled(preference, previewUserConfirmed))
+                }
             }
         }
         viewModelScope.launch { player.archiveEnded.collect { continueAfterCatchup() } }

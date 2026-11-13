@@ -203,7 +203,7 @@ fun LiveScreen(
         // Restoring focus or navigating the list must never open a stream.
         if (!effectivePreview || !previewArmed) return@LaunchedEffect
         val ch = previewChannel ?: return@LaunchedEffect
-        vm.playPreview(ch)
+        vm.playPreview(ch, userConfirmed = true)
     }
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()

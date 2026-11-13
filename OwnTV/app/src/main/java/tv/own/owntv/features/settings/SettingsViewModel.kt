@@ -269,8 +269,9 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setLivePreviewEnabled(enabled) }
     }
 
-    val livePreviewAudio: StateFlow<Boolean> = settings.livePreviewAudio
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val livePreviewAudio: StateFlow<Boolean> = settings.livePreviewAudioPreference
+        .map { it ?: true }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setLivePreviewAudio(enabled: Boolean) {
         viewModelScope.launch { settings.setLivePreviewAudio(enabled) }

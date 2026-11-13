@@ -2409,7 +2409,9 @@ class SettingsRepository(private val context: Context, private val localeStore: 
     private val lowSpecDevice: Boolean by lazy { tv.own.owntv.core.player.PlayerBudget.of(context).lowSpec }
 
     /** Whether the Live preview plays audio (off by default so browsing stays quiet). */
-    val livePreviewAudio: Flow<Boolean> = prefsFlow { it[Keys.LIVE_PREVIEW_AUDIO] ?: false }
+    /** Null means the viewer has not chosen whether previews should have audio. */
+    val livePreviewAudioPreference: Flow<Boolean?> = prefsFlow { it[Keys.LIVE_PREVIEW_AUDIO] }
+    val livePreviewAudio: Flow<Boolean> = livePreviewAudioPreference.map { it ?: false }
 
     suspend fun setLivePreviewAudio(enabled: Boolean) {
         context.dataStore.edit { it[Keys.LIVE_PREVIEW_AUDIO] = enabled }
