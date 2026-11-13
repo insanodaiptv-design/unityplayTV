@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import tv.own.owntv.core.CoreBuildInfo
 import java.io.File
@@ -92,6 +93,8 @@ class UpdateManager(
     }
 
     val currentVersion: String = CoreBuildInfo.versionName
+    private val isUnityplayTv = context.packageName == "com.unityplaytv.tv"
+    private val isUnityplayMobile = context.packageName == "com.unityplaytv.mobile"
 
     /** Queries GitHub's latest release; moves to Available / UpToDate / a semantic failure. */
     fun check() {
@@ -99,12 +102,24 @@ class UpdateManager(
         _state.value = State.Checking
         scope.launch {
             runCatching {
+                if (isUnityplayMobile) {
+                    val update = checkMobileReleases()
+                    settings.recordUpdateCheck(System.currentTimeMillis())
+                    _state.value = update?.let { State.Available(it) } ?: State.UpToDate
+                    return@runCatching
+                }
                 val request = Request.Builder()
                     .url("https://api.github.com/repos/${CoreBuildInfo.releaseRepo}/releases/latest")
                     .header("Accept", "application/vnd.github+json")
                     .header("User-Agent", "OwnTV")
                     .build()
                 client.newCall(request).execute().use { resp ->
+                    // The unityplayTV repository may exist before its first stable release.
+                    if (isUnityplayTv && resp.code == 404) {
+                        settings.recordUpdateCheck(System.currentTimeMillis())
+                        _state.value = State.UpToDate
+                        return@use
+                    }
                     if (!resp.isSuccessful) throw CheckHttpException(resp.code)
                     val body = resp.body.string()
                     if (body.isBlank()) throw InvalidReleaseResponseException()
@@ -113,20 +128,13 @@ class UpdateManager(
                         ?: throw InvalidReleaseResponseException()
                     val notes = o.optString("body").take(16_000)
                     val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // Releases carry one APK per ABI flavor (arm = generic, x86_64 suffixed). Never
-                    // silently install an APK for the wrong ABI.
                     val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
-                    val apkUrl = (0 until assets.length())
-                        .asSequence()
-                        .mapNotNull { assets.optJSONObject(it) }
-                        .mapNotNull { asset ->
-                            val name = asset.optString("name")
-                            val url = asset.optString("browser_download_url")
-                            if (!name.endsWith(".apk") || url.isBlank()) return@mapNotNull null
-                            val isX86 = name.contains("x86_64", ignoreCase = true)
-                            if (isX86 == wantX86) url else null
-                        }
-                        .firstOrNull()
+                    if (isUnityplayTv && !isNewer(version, currentVersion)) {
+                        settings.recordUpdateCheck(System.currentTimeMillis())
+                        _state.value = State.UpToDate
+                        return@use
+                    }
+                    val apkUrl = findUpdateApk(assets, wantX86, isUnityplayTv)
                         ?: throw NoCompatibleApkException()
                     val info = UpdateInfo(version, notes, apkUrl)
                     settings.recordUpdateCheck(System.currentTimeMillis())
@@ -137,6 +145,26 @@ class UpdateManager(
                 Log.w(TAG, "update check failed: ${error.message}", error)
                 _state.value = State.Failed(failureFor(error, checking = true))
             }
+        }
+    }
+
+    private fun checkMobileReleases(): UpdateInfo? {
+        val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
+        var best: UpdateInfo? = null
+        var page = 1
+        while (true) {
+            val request = Request.Builder()
+                .url("https://api.github.com/repos/${CoreBuildInfo.releaseRepo}/releases?per_page=100&page=$page")
+                .header("Accept", "application/vnd.github+json")
+                .build()
+            val releases = client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw CheckHttpException(response.code)
+                runCatching { JSONArray(response.body.string()) }
+                    .getOrElse { throw InvalidReleaseResponseException() }
+            }
+            selectMobileUpdate(releases, best?.version ?: currentVersion, wantX86)?.let { best = it }
+            if (releases.length() < 100) return best
+            page++
         }
     }
 
@@ -288,18 +316,6 @@ class UpdateManager(
         if (_state.value !is State.Downloading) _state.value = State.Idle
     }
 
-    /** Numeric segment-wise compare: "1.10.0" > "1.9.3"; non-numeric junk compares as 0. */
-    private fun isNewer(remote: String, local: String): Boolean {
-        val r = remote.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-        val l = local.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-        for (i in 0 until maxOf(r.size, l.size)) {
-            val a = r.getOrElse(i) { 0 }
-            val b = l.getOrElse(i) { 0 }
-            if (a != b) return a > b
-        }
-        return false
-    }
-
     private class InstallException(cause: Throwable) : IOException(cause)
 
     companion object {
@@ -307,4 +323,60 @@ class UpdateManager(
         private const val SESSION_ENTRY = "owntv-update"
         private const val INSTALL_STATUS_ACTION = "tv.own.owntv.UPDATE_INSTALL_STATUS"
     }
+}
+
+/** Select an asset for the installed platform and architecture. */
+internal fun findUpdateApk(assets: org.json.JSONArray, wantX86: Boolean, isUnityplayTv: Boolean): String? =
+    (0 until assets.length()).asSequence()
+        .mapNotNull { assets.optJSONObject(it) }
+        .firstNotNullOfOrNull { asset ->
+            val name = asset.optString("name")
+            val url = asset.optString("browser_download_url")
+            if (!name.endsWith(".apk") || url.isBlank()) return@firstNotNullOfOrNull null
+            if (isUnityplayTv && !name.startsWith("unityplayTV-AndroidTV-")) {
+                return@firstNotNullOfOrNull null
+            }
+            val isX86 = name.contains("x86_64", ignoreCase = true)
+            url.takeIf { isX86 == wantX86 }
+        }
+
+/** Numeric segment-wise compare: "1.10.0" > "1.9.3"; non-numeric junk compares as 0. */
+private fun isNewer(remote: String, local: String): Boolean {
+    val r = remote.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+    val l = local.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+    for (i in 0 until maxOf(r.size, l.size)) {
+        val a = r.getOrElse(i) { 0 }
+        val b = l.getOrElse(i) { 0 }
+        if (a != b) return a > b
+    }
+    return false
+}
+
+private val mobileReleaseTag = Regex("""mobile-v([0-9]+\.[0-9]+\.[0-9]+)""")
+
+/** Mobile versions are independent of the repository's latest TV release. */
+internal fun selectMobileUpdate(
+    releases: JSONArray,
+    installedVersion: String,
+    wantX86: Boolean,
+): UpdateManager.UpdateInfo? {
+    var best: UpdateManager.UpdateInfo? = null
+    for (index in 0 until releases.length()) {
+        val release = releases.optJSONObject(index) ?: continue
+        if (release.optBoolean("draft") || release.optBoolean("prerelease")) continue
+        val version = mobileReleaseTag.matchEntire(release.optString("tag_name"))
+            ?.groupValues?.get(1) ?: continue
+        if (!isNewer(version, best?.version ?: installedVersion)) continue
+        val assets = release.optJSONArray("assets") ?: continue
+        val suffix = if (wantX86) "-x86_64" else ""
+        val expectedName = "unityplayTV-Mobile-$version$suffix.apk"
+        val apkUrl = (0 until assets.length()).asSequence()
+            .mapNotNull { assets.optJSONObject(it) }
+            .firstNotNullOfOrNull { asset ->
+                asset.optString("browser_download_url")
+                    .takeIf { it.startsWith("https://") && asset.optString("name") == expectedName }
+            } ?: continue
+        best = UpdateManager.UpdateInfo(version, release.optString("body").take(16_000), apkUrl)
+    }
+    return best
 }
